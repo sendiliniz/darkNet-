@@ -48,12 +48,6 @@ PORT=5000
 PASTEBIN_API_KEY=your_pastebin_api_key_here
 ```
 
-### Admin Access
-
-To become an admin, use the special admin ID when setting your username:
-```
-495485ifd[fd-r-405i405]r4=
-```
 
 ## Usage
 
