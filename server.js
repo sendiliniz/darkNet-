@@ -90,7 +90,10 @@ const io = new Server(server, {
   upgradeTimeout: 30000,
   allowEIO3: true,
   allowUpgrades: true,
-  perMessageDeflate: false
+  perMessageDeflate: false,
+  maxHttpBufferSize: 1e8, // 100MB for file uploads
+  connectTimeout: 45000,
+  transports: ['polling', 'websocket']
 });
 
 // Store active users and server rooms
@@ -877,6 +880,32 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Rate limiting for messages
+  const messageRateLimit = new Map();
+  const MESSAGE_RATE_LIMIT = 5; // messages per 10 seconds
+  const RATE_LIMIT_WINDOW = 10000; // 10 seconds
+
+  function checkRateLimit(userId) {
+    const now = Date.now();
+    if (!messageRateLimit.has(userId)) {
+      messageRateLimit.set(userId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+      return true;
+    }
+
+    const userLimit = messageRateLimit.get(userId);
+    if (now > userLimit.resetTime) {
+      messageRateLimit.set(userId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+      return true;
+    }
+
+    if (userLimit.count >= MESSAGE_RATE_LIMIT) {
+      return false;
+    }
+
+    userLimit.count++;
+    return true;
+  }
+
   // Send message
   socket.on("send_message", ({ server, message, avatar, replyTo, threadId }) => {
     if (!userData || !validServers.includes(server) || !currentServers.has(server)) {
@@ -886,6 +915,12 @@ io.on("connection", (socket) => {
 
     if (!hasPermission(userData.id, server, 'send_messages')) {
       socket.emit('error_message', { message: 'You do not have permission to send messages in this server.' });
+      return;
+    }
+
+    // Check rate limit (skip for admins)
+    if (!userData.isAdmin && !checkRateLimit(userData.id)) {
+      socket.emit('error_message', { message: 'Rate limit exceeded. Please slow down.' });
       return;
     }
 
