@@ -1,11 +1,19 @@
-
 services:
   - type: web
     name: darknet-chat
     env: node
-    buildCommand: npm install
+    buildCommand: npm ci --only=production
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 5000
     autoDeploy: false
+    healthCheckPath: /health
+    disk:
+      name: darknet-chat-disk
+      mountPath: /opt/render/project/data
+      sizeGB: 1
